@@ -1,0 +1,16 @@
+<main class="app">
+  <h1>NuzEmu</h1>
+  <p>Premier test de communication avec Rust.</p>
+
+  <button type="button" (click)="testRust()" [disabled]="loading()">
+    {{ loading() ? 'Communication...' : 'Tester Rust' }}
+  </button>
+
+  @if (message()) {
+  <p class="message">{{ message() }}</p>
+  }
+
+  @if (error()) {
+  <p class="error">Erreur : {{ error() }}</p>
+  }
+</main>

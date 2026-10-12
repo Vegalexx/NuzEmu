@@ -1,0 +1,34 @@
+.app {
+    max-width: 720px;
+    margin: 4rem auto;
+    padding: 2rem;
+    font-family: system-ui, sans-serif;
+
+    h1 {
+        margin-bottom: 0.5rem;
+    }
+
+    button {
+        padding: 0.75rem 1rem;
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        font: inherit;
+
+        &:disabled {
+            cursor: wait;
+            opacity: 0.6;
+        }
+    }
+
+    .message {
+        margin-top: 1rem;
+        color: #16803c;
+    }
+
+    .error {
+        margin-top: 1rem;
+        color: #dc2626;
+        overflow-wrap: anywhere;
+    }
+}
