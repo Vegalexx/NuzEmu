@@ -1,0 +1,111 @@
+<section class="party">
+    <header class="party__header">
+        <div>
+            <p class="party__eyebrow">ÉQUIPE ACTIVE</p>
+            <h2>Mon équipe</h2>
+        </div>
+
+        @if (snapshot(); as data) {
+        <span class="party__count">
+            {{ data.partyCount }} / 6
+        </span>
+        }
+    </header>
+
+    @if (loading()) {
+    <div class="party__state">
+        Connexion au jeu...
+    </div>
+    } @else if (error()) {
+    <div class="party__state party__state--error">
+        {{ error() }}
+    </div>
+    } @else if (!snapshot()) {
+    <div class="party__state">
+        <span class="party__empty-icon">?</span>
+        <h3>En attente du jeu</h3>
+        <p>
+            Lance Pokémon Émeraude dans mGBA et active
+            le script NuzEmu pour synchroniser ton équipe.
+        </p>
+    </div>
+    } @else if (snapshot(); as data) {
+    @if (data.party.length === 0) {
+    <div class="party__state">
+        Ton équipe est vide pour le moment.
+    </div>
+    } @else {
+    <div class="party__grid">
+        @for (pokemon of data.party; track pokemon.slot) {
+        <article class="pokemon-card">
+            <div class="pokemon-card__top">
+                <span class="pokemon-card__slot">
+                    {{ pokemon.slot.toString().padStart(2, '0') }}
+                </span>
+
+                @if (pokemon.checksumValid) {
+                <span class="pokemon-card__status pokemon-card__status--valid" title="Checksum valide">
+                    <span class="status-dot"></span>
+                    Synchronisé
+                </span>
+                } @else {
+                <span class="pokemon-card__status pokemon-card__status--invalid">
+                    À vérifier
+                </span>
+                }
+            </div>
+
+            <div class="pokemon-card__identity">
+                <div class="pokemon-card__sprite">
+                    @if (pokemon.nationalDex !== null) {
+                    <img [src]="
+                      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' +
+                      pokemon.nationalDex +
+                      '.png'
+                    " [alt]="pokemon.name" loading="lazy" />
+                    } @else {
+                    <span>?</span>
+                    }
+                </div>
+
+                <div class="pokemon-card__details">
+                    <h3>{{ pokemon.name }}</h3>
+                    <p>
+                        #{{ pokemon.nationalDex ?? pokemon.speciesInternal }}
+                    </p>
+                    <span class="pokemon-card__level">
+                        Niv. {{ pokemon.level }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="pokemon-card__hp">
+                <div class="pokemon-card__hp-label">
+                    <span>PV</span>
+                    <span>{{ pokemon.hp }} / {{ pokemon.maxHp }}</span>
+                </div>
+
+                <div class="pokemon-card__hp-track" role="progressbar" [attr.aria-valuenow]="pokemon.hp"
+                    [attr.aria-valuemin]="0" [attr.aria-valuemax]="pokemon.maxHp"
+                    [attr.aria-label]="'PV de ' + pokemon.name">
+                    <div class="pokemon-card__hp-fill" [style.width.%]="
+                    getHpPercentage(pokemon.hp, pokemon.maxHp)
+                  " [class.pokemon-card__hp-fill--low]="
+                    getHpPercentage(pokemon.hp, pokemon.maxHp) <= 25
+                  "></div>
+                </div>
+            </div>
+        </article>
+        }
+    </div>
+    }
+
+    <footer class="party__footer">
+        <span class="status-dot"></span>
+        {{ data.gameTitle }} · {{ data.gameCode }}
+        <button type="button" (click)="refresh()">
+            Actualiser
+        </button>
+    </footer>
+    }
+</section>

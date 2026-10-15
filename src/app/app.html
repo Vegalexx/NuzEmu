@@ -1,16 +1,42 @@
-<main class="app">
-  <h1>NuzEmu</h1>
-  <p>Premier test de communication avec Rust.</p>
+<div class="workspace">
+  <aside class="sidebar">
+    <header class="brand">
+      <div class="brand__icon">N</div>
+      <div class="brand__text">
+        <h1>NuzEmu</h1>
+        <p>Ton aventure, tes règles.</p>
+      </div>
+    </header>
 
-  <button type="button" (click)="testRust()" [disabled]="loading()">
-    {{ loading() ? 'Communication...' : 'Tester Rust' }}
-  </button>
+    <div class="sidebar__content">
+      <app-party />
+    </div>
 
-  @if (message()) {
-  <p class="message">{{ message() }}</p>
-  }
+    <footer class="sidebar__footer">
+      <span class="connection-dot"></span>
+      <span>Compagnon Nuzlocke</span>
+    </footer>
+  </aside>
 
-  @if (error()) {
-  <p class="error">Erreur : {{ error() }}</p>
-  }
-</main>
+  <main class="game-area">
+    <header class="game-toolbar">
+      <div class="game-toolbar__title">
+        <span class="game-toolbar__indicator"></span>
+        <span>Émulation</span>
+      </div>
+
+      <div class="game-toolbar__actions">
+        <span class="game-toolbar__platform">GAME BOY ADVANCE</span>
+      </div>
+    </header>
+
+    <section class="game-stage">
+      <app-emulator />
+    </section>
+
+    <footer class="game-footer">
+      <span>NUZEMU DESKTOP</span>
+      <span>GBA · 240 × 160</span>
+    </footer>
+  </main>
+</div>
