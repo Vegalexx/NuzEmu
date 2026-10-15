@@ -1,3 +1,4 @@
+mod libretro;
 use std::io::{BufRead, BufReader};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
@@ -20,6 +21,42 @@ fn get_party_snapshot(snapshot: State<'_, PartySnapshot>) -> String {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .clone()
+}
+
+#[tauri::command]
+fn check_libretro_core() -> Result<String, String> {
+    libretro::inspect_core()
+}
+
+#[tauri::command]
+fn boot_libretro_rom() -> Result<String, String> {
+    libretro::boot_rom_test()
+}
+
+#[tauri::command]
+fn run_libretro_frame() -> Result<String, String> {
+    libretro::run_frame()
+}
+
+#[tauri::command]
+fn get_libretro_frame() -> Result<libretro::VideoFrame, String> {
+    libretro::get_video_frame()
+}
+
+#[tauri::command]
+fn set_libretro_button(button: String, pressed: bool) -> Result<(), String> {
+    libretro::set_button(&button, pressed)
+}
+
+#[tauri::command]
+fn run_libretro_frames(frames: u32) -> Result<String, String> {
+    libretro::run_frames(frames)
+}
+
+#[tauri::command]
+fn reset_libretro_rom() -> Result<String, String> {
+    libretro::shutdown_core()?;
+    libretro::boot_rom_test()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -83,8 +120,25 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            get_party_snapshot
+            get_party_snapshot,
+            check_libretro_core,
+            boot_libretro_rom,
+            run_libretro_frame,
+            get_libretro_frame,
+            set_libretro_button,
+            run_libretro_frames,
+            reset_libretro_rom
         ])
-        .run(tauri::generate_context!())
-        .expect("Erreur lors du démarrage de l'application Tauri");
+        .build(tauri::generate_context!())
+        .expect("Erreur lors du démarrage de l'application Tauri")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Err(error) = libretro::shutdown_core() {
+                    eprintln!(
+                        "[NuzEmu] Erreur pendant la fermeture : {error}"
+                    );
+                }
+            }
+        });
+
 }

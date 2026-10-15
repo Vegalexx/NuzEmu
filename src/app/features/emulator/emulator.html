@@ -1,28 +1,29 @@
-<section class="emulator">
-    <div class="emulator__screen-frame">
-        <div class="emulator__screen">
-            <canvas class="emulator__canvas" width="240" height="160"
-                aria-label="Écran du jeu Game Boy Advance"></canvas>
+<section class="emulator-test">
+    <div class="emulator-controls">
+        <button type="button" (click)="toggleGame()">
+            {{ isRunning() ? '⏸ Pause' : '▶ Démarrer' }}
+        </button>
 
-            <div class="emulator__placeholder">
-                <div class="emulator__chip">GBA</div>
+        <button type="button" (click)="cycleSpeed()">
+            Vitesse x{{ speed() }}
+        </button>
 
-                <div class="emulator__logo">N</div>
-
-                <h2>Prêt à jouer ?</h2>
-
-                <p>
-                    Le moteur d’émulation sera chargé ici.
-                    Ton jeu s’affichera dans cette zone.
-                </p>
-
-                <span class="emulator__resolution">240 × 160 PIXELS</span>
-            </div>
-        </div>
+        <button type="button" (click)="resetGame()">
+            ↻ Reset ROM
+        </button>
     </div>
 
-    <div class="emulator__hint">
-        <span>ÉCRAN DE JEU</span>
-        <span>Rendu pixel-perfect</span>
+    <div class="keyboard-hints">
+        <span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> Déplacement</span>
+        <span><kbd>M</kbd> A</span>
+        <span><kbd>L</kbd> B</span>
+        <span><kbd>A</kbd> L</span>
+        <span><kbd>E</kbd> R</span>
+        <span><kbd>Entrée</kbd> Start</span>
+        <span><kbd>Suppr</kbd> Select</span>
     </div>
+
+    <canvas #gameCanvas aria-label="Écran du jeu Pokémon Émeraude"></canvas>
+
+    <p>{{ diagnosticMessage() }}</p>
 </section>
