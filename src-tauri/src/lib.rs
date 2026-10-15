@@ -16,11 +16,22 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 fn get_party_snapshot(snapshot: State<'_, PartySnapshot>) -> String {
-    snapshot
-        .0
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .clone()
+    // Priorité à l'équipe du jeu exécuté dans NuzEmu.
+    match libretro::get_party_snapshot() {
+        Ok(live_snapshot) => live_snapshot,
+        Err(error) => {
+            eprintln!(
+                "[NuzEmu] Lecture de la RAM indisponible, \
+                 utilisation du pont TCP : {error}"
+            );
+
+            snapshot
+                .0
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone()
+        }
+    }
 }
 
 #[tauri::command]

@@ -24,6 +24,11 @@ type MemoryDataCallback = unsafe extern "C" fn(u32) -> *mut c_void;
 type MemorySizeCallback = unsafe extern "C" fn(u32) -> usize;
 
 const RETRO_MEMORY_SAVE_RAM: u32 = 0;
+const RETRO_MEMORY_SYSTEM_RAM: u32 = 2;
+
+const PARTY_BASE: usize = 0x020244EC - 0x02000000;
+const PARTY_COUNT: usize = 0x020244E9 - 0x02000000;
+const POKEMON_SIZE: usize = 100;
 // Attendre 30 frames sans changement avant d'écrire le fichier.
 const SAVE_STABLE_FRAMES: u32 = 30;
 
@@ -748,6 +753,224 @@ pub fn run_frames(frames: u32) -> Result<String, String> {
     }
 
     Ok(format!("{frames} frame(s) exécutée(s)."))
+}
+
+const POKEMON_ORDERS: [&str; 24] = [
+    "GAEM", "GAME", "GEAM", "GEMA", "GMAE", "GMEA",
+    "AGEM", "AGME", "AEGM", "AEMG", "AMGE", "AMEG",
+    "EGAM", "EGMA", "EAGM", "EAMG", "EMGA", "EMAG",
+    "MGAE", "MGEA", "MAGE", "MAEG", "MEGA", "MEAG",
+];
+
+fn read_u8(ram: &[u8], offset: usize) -> Option<u8> {
+    ram.get(offset).copied()
+}
+
+fn read_u16(ram: &[u8], offset: usize) -> Option<u16> {
+    Some(u16::from_le_bytes([
+        *ram.get(offset)?,
+        *ram.get(offset.checked_add(1)?)?,
+    ]))
+}
+
+fn read_u32(ram: &[u8], offset: usize) -> Option<u32> {
+    Some(u32::from_le_bytes([
+        *ram.get(offset)?,
+        *ram.get(offset.checked_add(1)?)?,
+        *ram.get(offset.checked_add(2)?)?,
+        *ram.get(offset.checked_add(3)?)?,
+    ]))
+}
+
+fn species_info(species: u16) -> (&'static str, Option<u16>) {
+    match species {
+        277 => ("Arcko", Some(252)),
+        278 => ("Massko", Some(253)),
+        279 => ("Jungko", Some(254)),
+        280 => ("Poussifeu", Some(255)),
+        281 => ("Galifeu", Some(256)),
+        282 => ("Braségali", Some(257)),
+        283 => ("Gobou", Some(258)),
+        284 => ("Flobio", Some(259)),
+        285 => ("Laggron", Some(260)),
+        286 => ("Medhyèna", Some(261)),
+        287 => ("Grahyèna", Some(262)),
+        288 => ("Zigzaton", Some(263)),
+        289 => ("Linéon", Some(264)),
+        290 => ("Chenipotte", Some(265)),
+        291 => ("Armulys", Some(266)),
+        292 => ("Charmillon", Some(267)),
+        293 => ("Blindalys", Some(268)),
+        294 => ("Papinox", Some(269)),
+        _ => ("Espèce inconnue", None),
+    }
+}
+
+fn read_party_snapshot_from_ram(ram: &[u8]) -> Result<String, String> {
+    let count = read_u8(ram, PARTY_COUNT)
+        .ok_or_else(|| "Compteur d'équipe hors de la RAM exposée.".to_string())?;
+
+    if count > 6 {
+        return Err(format!("Compteur d'équipe invalide : {count}"));
+    }
+
+    let mut pokemon_json = Vec::with_capacity(count as usize);
+
+    for slot in 0..count as usize {
+        let base = PARTY_BASE + slot * POKEMON_SIZE;
+
+        let personality = read_u32(ram, base)
+            .ok_or_else(|| "Personnalité Pokémon illisible.".to_string())?;
+
+        let trainer_id = read_u32(ram, base + 4)
+            .ok_or_else(|| "Identifiant du dresseur illisible.".to_string())?;
+
+        let key = personality ^ trainer_id;
+        let order = POKEMON_ORDERS[(personality % 24) as usize];
+
+        let growth_index = order
+            .find('G')
+            .ok_or_else(|| "Ordre des données Pokémon invalide.".to_string())?;
+
+        let mut words = [0_u32; 12];
+
+        for (i, word) in words.iter_mut().enumerate() {
+            let encrypted = read_u32(ram, base + 0x20 + i * 4)
+                .ok_or_else(|| "Données Pokémon tronquées.".to_string())?;
+
+            *word = encrypted ^ key;
+        }
+
+        let species = (words[growth_index * 3] & 0xFFFF) as u16;
+        eprintln!("[NuzEmu] Espèce interne lue en RAM : {species}");
+
+        let mut checksum: u16 = 0;
+
+        for word in words {
+            checksum = checksum.wrapping_add(word as u16);
+            checksum = checksum.wrapping_add((word >> 16) as u16);
+        }
+
+        let stored_checksum = read_u16(ram, base + 0x1C)
+            .ok_or_else(|| "Checksum Pokémon illisible.".to_string())?;
+
+        let level = read_u8(ram, base + 0x54)
+            .ok_or_else(|| "Niveau Pokémon illisible.".to_string())?;
+
+        let hp = read_u16(ram, base + 0x56)
+            .ok_or_else(|| "PV Pokémon illisibles.".to_string())?;
+
+        let max_hp = read_u16(ram, base + 0x58)
+            .ok_or_else(|| "PV maximum Pokémon illisibles.".to_string())?;
+
+        let (name, national_dex) = species_info(species);
+
+        let dex_json = national_dex
+            .map(|dex| dex.to_string())
+            .unwrap_or_else(|| "null".to_string());
+
+        pokemon_json.push(format!(
+            concat!(
+                "{{\"slot\":{},\"name\":\"{}\",",
+                "\"speciesInternal\":{},\"nationalDex\":{},",
+                "\"level\":{},\"hp\":{},\"maxHp\":{},",
+                "\"checksumValid\":{}}}"
+            ),
+            slot + 1,
+            name,
+            species,
+            dex_json,
+            level,
+            hp,
+            max_hp,
+            checksum == stored_checksum
+        ));
+    }
+
+    Ok(format!(
+        concat!(
+            "{{\"gameTitle\":\"Pokémon Émeraude\",",
+            "\"gameCode\":\"AGB-BPEF\",",
+            "\"partyCount\":{},\"party\":[{}]}}"
+        ),
+        count,
+        pokemon_json.join(",")
+    ))
+}
+
+/// Lit l'équipe depuis la RAM du jeu actuellement exécuté.
+pub fn get_party_snapshot() -> Result<String, String> {
+    let state = core_state()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+
+    let core = state
+        .as_ref()
+        .ok_or_else(|| "Le cœur mGBA n'est pas démarré.".to_string())?;
+
+    // Pokémon Émeraude utilise l'EWRAM GBA, qui fait 256 Ko.
+    // Certaines versions de mGBA Libretro annoncent à tort 32 Ko.
+    let reported_size = unsafe {
+        (core.get_memory_size)(RETRO_MEMORY_SYSTEM_RAM)
+    };
+
+    let size = if reported_size == 32 * 1024 {
+        256 * 1024
+    } else {
+        reported_size
+    };
+
+    eprintln!(
+        "[mGBA] SYSTEM_RAM annoncée : {} octets, taille utilisée : {} octets",
+        reported_size,
+        size
+    );
+
+    let data = unsafe {
+        (core.get_memory_data)(RETRO_MEMORY_SYSTEM_RAM)
+    };
+
+    eprintln!(
+        "[mGBA] SYSTEM_RAM : {} octets, pointeur : {:p}",
+        size,
+        data
+    );
+
+    let save_size = unsafe {
+        (core.get_memory_size)(RETRO_MEMORY_SAVE_RAM)
+    };
+
+    let save_data = unsafe {
+        (core.get_memory_data)(RETRO_MEMORY_SAVE_RAM)
+    };
+
+    eprintln!(
+        "[mGBA] SAVE_RAM : {} octets, pointeur : {:p}",
+        save_size,
+        save_data
+    );
+
+    if size == 0 || data.is_null() {
+        return Err(
+            "Le cœur mGBA n'expose pas la RAM système.".to_string()
+        );
+    }
+
+    let required_size = PARTY_BASE
+        .checked_add(6 * POKEMON_SIZE)
+        .ok_or_else(|| "Offset de l'équipe invalide.".to_string())?;
+
+    if size < required_size {
+        return Err(format!(
+            "RAM trop petite : {size} octets, {required_size} requis."
+        ));
+    }
+
+    let ram = unsafe {
+        slice::from_raw_parts(data.cast::<u8>(), size)
+    };
+
+    read_party_snapshot_from_ram(ram)
 }
 
 pub fn get_video_frame() -> Result<VideoFrame, String> {

@@ -258,7 +258,7 @@ export class EmulatorComponent implements OnDestroy {
 
   private readonly keyMap: Record<string, string> = {
     enter: 'start',
-    delete: 'select',
+    backspace: 'select',
     z: 'up',
     q: 'left',
     s: 'down',
@@ -290,6 +290,9 @@ export class EmulatorComponent implements OnDestroy {
 
     const key = event.key.toLowerCase();
 
+    if (event.key === 'backspace') {
+      event.preventDefault();
+    }
     // Raccourcis globaux de l'émulateur.
     switch (key) {
       case 'tab':
